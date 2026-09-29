@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+
+# Secrets
+.env
+
+# Frontend
+node_modules/
+
+# macOS
+.DS_Store
