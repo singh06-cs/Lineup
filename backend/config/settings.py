@@ -164,6 +164,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_RATES': {
+        'join': '10/minute',
+    },
 }
 
 SIMPLE_JWT = {
