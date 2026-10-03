@@ -380,3 +380,17 @@ class ClassConflictTests(CatalogApiTestCase):
             self.conflicts(self.utc(2026, 12, 8, 17), self.utc(2026, 12, 8, 19)),
             ['ECS 036A final exam'],
         )
+
+
+class MeetingOrderTests(CatalogApiTestCase):
+    def test_meetings_listed_in_calendar_order(self):
+        data = self.add_section(meetings=[
+            {'kind': 'DIS', 'days': 'F', 'start_time': '15:10', 'end_time': '16:00'},
+            {'kind': 'LEC', 'days': 'TR', 'start_time': '16:10', 'end_time': '17:30'},
+            {'kind': 'LAB', 'days': 'T', 'start_time': '08:00', 'end_time': '10:50'},
+        ])
+
+        self.assertEqual(
+            [(m['days'], m['start_time']) for m in data['meetings']],
+            [('T', '08:00:00'), ('TR', '16:10:00'), ('F', '15:10:00')],
+        )

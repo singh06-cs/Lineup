@@ -1,4 +1,4 @@
-from django.db.models import Count, Exists, OuterRef, Prefetch
+from django.db.models import Count, Exists, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from . import services
 from .filters import SectionFilter
-from .models import Course, Enrollment, Meeting, Section, Term
+from .models import Course, Enrollment, Section, Term
 from .permissions import IsCreatorOrStaff
 from .serializers import CourseSerializer, SectionSerializer, TermSerializer
 
@@ -46,7 +46,7 @@ class SectionViewSet(
             Section.objects
             .select_related('course', 'term', 'created_by')
             # One extra query for ALL sections' meetings, not one per section.
-            .prefetch_related(Prefetch('meetings', queryset=Meeting.objects.order_by('kind', 'start_time')))
+            .prefetch_related('meetings')
             .annotate(
                 enrolled_count=Count('enrollments'),
                 is_enrolled=Exists(Enrollment.objects.filter(section=OuterRef('pk'), user=user)),

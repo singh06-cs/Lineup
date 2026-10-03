@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 
 import * as api from '../api'
 import ClubMeetings from '../components/ClubMeetings'
@@ -16,6 +16,7 @@ export default function OrganizationPage() {
   const [creating, setCreating] = useState(false)
   const [shiftsVersion, setShiftsVersion] = useState(0)
   const [error, setError] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   if (org.loading && !org.data) return <p className="muted">Loading…</p>
   if (org.error?.status === 404) return <p className="empty">Organization not found, or you're not a member.</p>
@@ -23,6 +24,16 @@ export default function OrganizationPage() {
 
   const isAdmin = org.data.my_role === 'admin'
 
+  const tabs = [
+    ['shifts', 'Shifts'],
+    ['meetings', 'Weekly meetings'],
+    ['members', `Members (${org.data.member_count})`],
+    ...(isAdmin ? [['settings', 'Settings']] : []),
+  ]
+  // The tab lives in the URL (?tab=members), so refreshing or sharing the link keeps it.
+  const requested = searchParams.get('tab')
+  const tab = tabs.some(([key]) => key === requested) ? requested : 'shifts'
+  const selectTab = (key) => setSearchParams(key === 'shifts' ? {} : { tab: key }, { replace: true })
 
   async function leave() {
     if (!window.confirm(`Leave ${org.data.name}?`)) return
@@ -56,15 +67,27 @@ export default function OrganizationPage() {
             </a>
           )}
         </div>
-        <div className="actions">
-          <button type="button" className="secondary" onClick={leave}>Leave</button>
-          {isAdmin && <button type="button" className="secondary danger" onClick={deleteOrg}>Delete</button>}
-        </div>
+        <button type="button" className="secondary" onClick={leave}>Leave</button>
       </header>
       <ErrorMessage error={error} />
 
-      <div className="dashboard">
-        <section className="stack">
+      <div className="tabs" role="tablist" aria-label="Organization sections">
+        {tabs.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? 'tab active' : 'tab'}
+            onClick={() => selectTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'shifts' && (
+        <section className="stack tab-panel">
           <div className="section-head">
             <h2>Upcoming shifts</h2>
             {isAdmin && !creating && <button type="button" onClick={() => setCreating(true)}>New shift</button>}
@@ -82,14 +105,31 @@ export default function OrganizationPage() {
             emptyText={isAdmin ? 'No upcoming shifts. Create the first one.' : 'No upcoming shifts yet.'}
           />
         </section>
+      )}
 
-        <aside className="stack">
-          {isAdmin && <InvitePanel org={org.data} onChange={org.setData} />}
+      {tab === 'meetings' && (
+        <section className="tab-panel">
           <ClubMeetings orgId={orgId} isAdmin={isAdmin} />
-          {isAdmin && <ClublyLinkForm org={org.data} onChange={org.setData} />}
+        </section>
+      )}
+
+      {tab === 'members' && (
+        <section className="stack tab-panel">
+          {isAdmin && <InvitePanel org={org.data} onChange={org.setData} />}
           <MemberList orgId={orgId} isAdmin={isAdmin} onChanged={org.reload} />
-        </aside>
-      </div>
+        </section>
+      )}
+
+      {tab === 'settings' && isAdmin && (
+        <section className="stack tab-panel">
+          <ClublyLinkForm org={org.data} onChange={org.setData} />
+          <div className="card danger-zone">
+            <h3>Delete organization</h3>
+            <p className="muted small">Removes the organization with all of its shifts, signups and meetings. This cannot be undone.</p>
+            <button type="button" className="secondary danger" onClick={deleteOrg}>Delete {org.data.name}</button>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

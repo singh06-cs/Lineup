@@ -1,8 +1,9 @@
 import { useState } from 'react'
 
 import * as api from '../api'
-import { formatSlot, pickCurrentTerm } from '../format'
+import { formatSlot, pickCurrentTerm, toggleDay } from '../format'
 import useApi from '../hooks/useApi'
+import DaysPicker from './DaysPicker'
 import ErrorMessage from './ErrorMessage'
 
 // An org's weekly meetings (they show up on every member's schedule and calendar feed).
@@ -63,11 +64,18 @@ function ClubMeetingForm({ orgId, onSaved, onCancel }) {
     term: '', title: 'General meeting', days: '', start_time: '', end_time: '', location: '',
   })
   const [error, setError] = useState(null)
-  const update = (e) => setFields({ ...fields, [e.target.name]: e.target.value })
+  const update = (e) => {
+    const { name, value } = e.target
+    setFields((f) => ({ ...f, [name]: value }))
+  }
   const termId = fields.term || (terms.data?.length ? pickCurrentTerm(terms.data).id : '')
 
   async function submit(event) {
     event.preventDefault()
+    if (!fields.days) {
+      setError(new Error('Pick at least one day.'))
+      return
+    }
     setError(null)
     try {
       await api.clubMeetings.create({ ...fields, term: termId, organization: Number(orgId) })
@@ -89,10 +97,11 @@ function ClubMeetingForm({ orgId, onSaved, onCancel }) {
           <input name="title" value={fields.title} onChange={update} required />
         </label>
       </div>
+      <div className="field">
+        <span className="field-label">Days</span>
+        <DaysPicker value={fields.days} onToggle={(day) => setFields((f) => ({ ...f, days: toggleDay(f.days, day) }))} />
+      </div>
       <div className="row">
-        <label className="narrow">Days
-          <input name="days" value={fields.days} onChange={update} placeholder="T" required />
-        </label>
         <label>Starts
           <input type="time" name="start_time" value={fields.start_time} onChange={update} required />
         </label>
@@ -103,7 +112,7 @@ function ClubMeetingForm({ orgId, onSaved, onCancel }) {
       <label>Location
         <input name="location" value={fields.location} onChange={update} />
       </label>
-      <p className="muted small">Repeats every week of the term, skipping holidays. R = Thursday.</p>
+      <p className="muted small">Repeats every week of the term, skipping holidays.</p>
       <ErrorMessage error={error} />
       <div className="actions">
         <button type="submit">Save meeting</button>

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import * as api from '../api'
+import { toggleDay } from '../format'
+import DaysPicker from './DaysPicker'
 import ErrorMessage from './ErrorMessage'
 
 const emptyMeeting = () => ({ kind: 'LEC', days: '', start_time: '', end_time: '', location: '' })
@@ -14,12 +16,18 @@ export default function SectionForm({ termId, onSaved, onCancel }) {
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  const updateMeeting = (index, field, value) => setMeetings(
-    meetings.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
-  )
+  // Functional update: always starts from the latest meetings, never a stale copy.
+  const updateMeeting = (index, field, value) => setMeetings((current) => current.map(
+    (m, i) => (i === index ? { ...m, [field]: typeof value === 'function' ? value(m[field]) : value } : m),
+  ))
 
   async function submit(event) {
     event.preventDefault()
+    // Day toggles are buttons, so the browser's `required` check can't cover them.
+    if (meetings.some((m) => !m.days)) {
+      setError(new Error('Pick at least one day for each meeting.'))
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -73,29 +81,32 @@ export default function SectionForm({ termId, onSaved, onCancel }) {
         {meetings.map((m, i) => (
           // Rows have no id yet; index keys are fine because rows are only appended/removed here.
           // oxlint-disable-next-line react/no-array-index-key
-          <div className="row meeting-row" key={i}>
-            <select value={m.kind} onChange={(e) => updateMeeting(i, 'kind', e.target.value)} aria-label="Type">
-              <option value="LEC">Lecture</option>
-              <option value="DIS">Discussion</option>
-              <option value="LAB">Lab</option>
-              <option value="SEM">Seminar</option>
-              <option value="OTH">Other</option>
-            </select>
-            <input value={m.days} onChange={(e) => updateMeeting(i, 'days', e.target.value)} placeholder="Days, e.g. MWF or TR" aria-label="Days" required />
-            <input type="time" value={m.start_time} onChange={(e) => updateMeeting(i, 'start_time', e.target.value)} aria-label="Start" required />
-            <input type="time" value={m.end_time} onChange={(e) => updateMeeting(i, 'end_time', e.target.value)} aria-label="End" required />
-            <input value={m.location} onChange={(e) => updateMeeting(i, 'location', e.target.value)} placeholder="Location" aria-label="Location" />
-            {meetings.length > 1 && (
-              <button type="button" className="link-button danger" onClick={() => setMeetings(meetings.filter((_, j) => j !== i))}>
-                Remove
-              </button>
-            )}
+          <div className="meeting-row" key={i}>
+            <div className="row">
+              <select value={m.kind} onChange={(e) => updateMeeting(i, 'kind', e.target.value)} aria-label="Type">
+                <option value="LEC">Lecture</option>
+                <option value="DIS">Discussion</option>
+                <option value="LAB">Lab</option>
+                <option value="SEM">Seminar</option>
+                <option value="OTH">Other</option>
+              </select>
+              <DaysPicker value={m.days} onToggle={(day) => updateMeeting(i, 'days', (days) => toggleDay(days, day))} />
+            </div>
+            <div className="row">
+              <input type="time" value={m.start_time} onChange={(e) => updateMeeting(i, 'start_time', e.target.value)} aria-label="Start" required />
+              <input type="time" value={m.end_time} onChange={(e) => updateMeeting(i, 'end_time', e.target.value)} aria-label="End" required />
+              <input value={m.location} onChange={(e) => updateMeeting(i, 'location', e.target.value)} placeholder="Location" aria-label="Location" />
+              {meetings.length > 1 && (
+                <button type="button" className="link-button danger" onClick={() => setMeetings(meetings.filter((_, j) => j !== i))}>
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
         ))}
         <button type="button" className="link-button" onClick={() => setMeetings([...meetings, emptyMeeting()])}>
           + Add another meeting (e.g. discussion)
         </button>
-        <p className="muted small">Days use UC Davis letters: M T W R F (R = Thursday).</p>
       </fieldset>
 
       <ErrorMessage error={error} />

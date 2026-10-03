@@ -174,7 +174,6 @@ a.button.secondary:hover { background: var(--accent-soft); }
 .result-list li:first-child { border-top: none; }
 .meetings-fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .meetings-fieldset legend { font-size: 0.875rem; font-weight: 600; padding: 0 0.25rem; }
-.meeting-row > input, .meeting-row > select { flex: 1; min-width: 6rem; }
 
 .week-grid {
   display: grid; grid-template-columns: 3.2rem repeat(var(--days), minmax(0, 1fr));
@@ -195,3 +194,28 @@ a.button.secondary:hover { background: var(--accent-soft); }
 .week-block span { opacity: 0.85; }
 .tone-class { background: var(--accent-soft); color: var(--accent); border-left: 3px solid var(--accent); }
 .tone-club { background: var(--success-soft); color: var(--success); border-left: 3px solid var(--success); }
+
+/* ---------- day toggles ---------- */
+.days-picker { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.days-picker .day {
+  font-size: 0.8rem; font-weight: 600; padding: 0.35rem 0.55rem; min-width: 2.9rem;
+  background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+}
+.days-picker .day:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.days-picker .day.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.meeting-row { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.6rem 0; border-top: 1px dashed var(--border); }
+.meeting-row:first-of-type { border-top: none; padding-top: 0; }
+.meeting-row input { flex: 1; min-width: 6rem; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field-label { font-size: 0.875rem; font-weight: 500; }
+
+/* ---------- org page tabs ---------- */
+.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs .tab {
+  background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0;
+  color: var(--muted); font-weight: 600; padding: 0.6rem 0.85rem; white-space: nowrap; margin-bottom: -1px;
+}
+.tabs .tab:hover:not(:disabled) { background: none; color: var(--text); }
+.tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { max-width: 760px; }
+.danger-zone { border-color: var(--danger-soft); display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }

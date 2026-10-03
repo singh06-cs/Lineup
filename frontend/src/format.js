@@ -38,8 +38,21 @@ export function minutesOfDay(value) {
   return hours * 60 + minutes
 }
 
+// "MWF" -> "Mon/Wed/Fri" (UC Davis letters, with R = Thursday, are easy to misread)
+export function formatDays(days) {
+  return [...days].map((letter) => DAY_NAMES[letter]).join('/')
+}
+
 export function formatSlot(slot) {
-  return `${slot.days} ${formatTimeOfDay(slot.start_time)}–${formatTimeOfDay(slot.end_time)}`
+  return `${formatDays(slot.days)} ${formatTimeOfDay(slot.start_time)}–${formatTimeOfDay(slot.end_time)}`
+}
+
+// Add or remove one day letter, keeping weekday order: toggleDay("MF", "W") -> "MWF"
+export function toggleDay(days, letter) {
+  const chosen = new Set(days)
+  if (chosen.has(letter)) chosen.delete(letter)
+  else chosen.add(letter)
+  return 'MTWRFSU'.split('').filter((l) => chosen.has(l)).join('')
 }
 
 // The term that's in session now, otherwise the next one, otherwise the latest.

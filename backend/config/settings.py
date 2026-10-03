@@ -157,7 +157,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# With USE_TZ on, the database still stores every datetime in UTC. TIME_ZONE only
+# decides how datetimes are shown and entered (e.g. in the admin), so staff work
+# in Davis time instead of converting from UTC by hand.
+TIME_ZONE = 'America/Los_Angeles'
 
 # Class meeting times ("MWF 10:00") are wall-clock times on campus, not UTC instants.
 CAMPUS_TIME_ZONE = 'America/Los_Angeles'

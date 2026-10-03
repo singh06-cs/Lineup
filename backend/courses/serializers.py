@@ -108,6 +108,13 @@ class SectionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id']
 
+    def to_representation(self, section):
+        data = super().to_representation(section)
+        # Calendar order: first weekday (M T W R F S U), then start time. So a Tue/Thu
+        # lecture comes before a Friday discussion, regardless of meeting type.
+        data['meetings'].sort(key=lambda m: (WEEKDAY_LETTERS.index(m['days'][0]), m['start_time']))
+        return data
+
     def get_can_edit(self, section):
         user = self.context['request'].user
         return user.is_staff or section.created_by_id == user.id
