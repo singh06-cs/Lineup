@@ -21,6 +21,8 @@ frontend and a **Django REST Framework** backend.
 - Shift signups that respect your class schedule, including the daylight-saving change
 - Weekly club meetings, and orgs linked to their [Clubly](https://clubly.org) page
 - A private calendar feed (.ics) for Google, Apple and Outlook Calendar
+- Sign in with Google, and direct Google Calendar sync into a dedicated "Lineup" calendar
+- An Account page for your profile and sign-in methods
 - A customized Django admin for staff
 
 ## Tech stack
@@ -41,7 +43,7 @@ backend/
   organizations/   Organization, Membership (role), invite codes, member management
   scheduling/      Shift, Signup, ClubMeeting, signup rules (services.py), filters
   courses/         Term, Holiday, Course, Section, Meeting, Enrollment, conflict rules
-  calendars/       per-user secret feed URL and the .ics builder
+  calendars/       calendar feed (.ics), Google Calendar OAuth + sync, encrypted token storage
 frontend/
   src/api/         HTTP client (JWT + refresh) and one function per endpoint
   src/auth/        auth context and route guard
@@ -93,9 +95,9 @@ the command refuses to run when `DEBUG` is off.
 cd backend && ../.venv/bin/python manage.py test
 ```
 
-111 tests cover authentication, permissions, validation, filtering, query counts
+142 tests cover authentication, permissions, validation, filtering, query counts
 (N+1 guard), every signup and enrollment rule, time-zone handling across the
-daylight-saving change, the calendar feed (its repeat rules are expanded and checked
+daylight-saving change, Google sign-in and Calendar sync (against a fake Google), the calendar feed (its repeat rules are expanded and checked
 against the real Fall 2026 class days), and a concurrency test where 8 users race for
 2 spots at the same instant.
 
@@ -121,6 +123,11 @@ against the real Fall 2026 class days), and a concurrency test where 8 users rac
 | `POST/DELETE /api/sections/{id}/enroll/` | Add to / drop from your schedule |
 | `GET/POST /api/calendar/feed/` | Your calendar links / make a new secret link |
 | `GET /calendar/{token}.ics` | The calendar feed itself (the token is the credential) |
+| `POST/DELETE /api/auth/google/` | Sign in with Google (or link it while logged in) / unlink |
+| `GET /api/auth/google/config/` | Whether Google is set up, and the public client ID |
+| `GET/DELETE /api/calendar/google/` | Google Calendar connection status / disconnect |
+| `POST /api/calendar/google/connect/` | Get Google's approval URL |
+| `POST /api/calendar/google/sync/` | Sync now |
 
 ## Deploying
 
@@ -132,6 +139,29 @@ Each deploy also runs `load_terms`, which is safe to repeat, so the quarter date
 
 Google Calendar can only subscribe to a feed on the public internet, so "Add to
 Google Calendar" works once deployed; locally, use "Download .ics" to check the feed.
+
+## Google sign-in and Calendar sync (optional)
+
+Everything Google-related stays hidden until these are set. To turn it on:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and
+   enable the **Google Calendar API**.
+2. Set up the **OAuth consent screen** (External). While it's in "Testing", add your own
+   Google account under **Test users**.
+3. Under **Credentials**, create an **OAuth client ID** of type **Web application**:
+   - Authorized JavaScript origins: `http://localhost:5173`
+   - Authorized redirect URIs: `http://localhost:8000/api/calendar/google/callback/`
+4. Put the client ID and secret in `backend/.env`:
+   ```
+   GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-...
+   ```
+5. Restart the backend. The Google button appears on the login page, and "Connect
+   Google Calendar" appears on My schedule and the Account page.
+
+Lineup asks only for the `calendar.app.created` scope: it can create and manage its own
+"Lineup" calendar, and cannot read or change anything else in your Google Calendar.
+Refresh tokens are encrypted before they're stored.
 
 ## Data sources
 

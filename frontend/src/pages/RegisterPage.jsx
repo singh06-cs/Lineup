@@ -3,15 +3,27 @@ import { Link, Navigate, useNavigate } from 'react-router'
 
 import useAuth from '../auth/useAuth'
 import ErrorMessage from '../components/ErrorMessage'
+import GoogleButton from '../components/GoogleButton'
 
 export default function RegisterPage() {
-  const { user, register } = useAuth()
+  const { user, register, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [fields, setFields] = useState({ username: '', email: '', password: '' })
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   if (user) return <Navigate to="/" replace />
+
+  async function googleCredential(credential) {
+    setError(null)
+    try {
+      await loginWithGoogle(credential)
+      navigate('/', { replace: true })
+    } catch (err) {
+      // e.g. 409: an account with this email exists, so log in with the password first
+      setError(err)
+    }
+  }
 
   const update = (event) => setFields({ ...fields, [event.target.name]: event.target.value })
 
@@ -47,6 +59,7 @@ export default function RegisterPage() {
         </label>
         <ErrorMessage error={error} />
         <button type="submit" disabled={submitting}>{submitting ? 'Creating account…' : 'Sign up'}</button>
+        <GoogleButton onCredential={googleCredential} />
         <p className="muted small">Already have an account? <Link to="/login">Log in</Link></p>
       </form>
     </main>

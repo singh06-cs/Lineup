@@ -24,6 +24,12 @@ export function fromLocalInput(value) {
   return value ? new Date(value).toISOString() : ''
 }
 
+const dateTimeShort = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+export function formatDateTime(iso) {
+  return dateTimeShort.format(new Date(iso))
+}
+
 export const DAY_NAMES = { M: 'Mon', T: 'Tue', W: 'Wed', R: 'Thu', F: 'Fri', S: 'Sat', U: 'Sun' }
 
 // "14:10:00" (a campus wall-clock time from the API) -> "2:10 PM"

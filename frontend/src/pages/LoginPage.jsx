@@ -3,9 +3,10 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 
 import useAuth from '../auth/useAuth'
 import ErrorMessage from '../components/ErrorMessage'
+import GoogleButton from '../components/GoogleButton'
 
 export default function LoginPage() {
-  const { user, login } = useAuth()
+  const { user, login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [username, setUsername] = useState('')
@@ -14,6 +15,17 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   if (user) return <Navigate to="/" replace />
+
+  async function googleCredential(credential) {
+    setError(null)
+    try {
+      await loginWithGoogle(credential)
+      navigate(location.state?.from ?? '/', { replace: true })
+    } catch (err) {
+      // e.g. 409: an account with this email exists, so log in with the password first
+      setError(err)
+    }
+  }
 
   async function submit(event) {
     event.preventDefault()
@@ -44,6 +56,7 @@ export default function LoginPage() {
         </label>
         <ErrorMessage error={error} />
         <button type="submit" disabled={submitting}>{submitting ? 'Logging in…' : 'Log in'}</button>
+        <GoogleButton onCredential={googleCredential} />
         <p className="muted small">No account? <Link to="/register">Sign up</Link></p>
       </form>
     </main>

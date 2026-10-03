@@ -24,6 +24,15 @@ export const auth = {
     }
   },
   me: () => request('/api/auth/me/'),
+  updateMe: (fields) => request('/api/auth/me/', { method: 'PATCH', body: fields }),
+  googleConfig: () => request('/api/auth/google/config/', { auth: false }),
+  async googleLogin(credential) {
+    const data = await request('/api/auth/google/', { method: 'POST', body: { credential }, auth: false })
+    tokens.save(data)
+  },
+  // While logged in, the same endpoint links Google to the current account.
+  linkGoogle: (credential) => request('/api/auth/google/', { method: 'POST', body: { credential } }),
+  unlinkGoogle: () => request('/api/auth/google/', { method: 'DELETE' }),
 }
 
 export const organizations = {
@@ -84,4 +93,8 @@ export const clubMeetings = {
 export const calendar = {
   links: () => request('/api/calendar/feed/'),
   regenerate: () => request('/api/calendar/feed/', { method: 'POST' }),
+  googleStatus: () => request('/api/calendar/google/'),
+  googleConnect: () => request('/api/calendar/google/connect/', { method: 'POST' }),
+  googleSync: () => request('/api/calendar/google/sync/', { method: 'POST' }),
+  googleDisconnect: () => request('/api/calendar/google/', { method: 'DELETE' }),
 }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import * as api from '../api'
 import useApi from '../hooks/useApi'
 import ErrorMessage from './ErrorMessage'
+import GoogleCalendarSync from './GoogleCalendarSync'
 
 export default function CalendarPanel() {
   const links = useApi(() => api.calendar.links())
@@ -27,15 +28,18 @@ export default function CalendarPanel() {
   return (
     <section className="card stack">
       <h3>Add to your calendar</h3>
+      <p className="muted small">Classes, club meetings and shifts you sign up for, all in one place.</p>
+      <GoogleCalendarSync />
+      <h4>Subscribe with a link</h4>
       <p className="muted small">
-        Classes, club meetings and shifts you sign up for, kept in sync. Google refreshes
-        subscribed calendars every few hours, so changes can take a while to appear.
+        Works with any calendar app, no sign-in needed. Calendar apps re-check links every
+        few hours, so changes can take a while to appear.
       </p>
       <ErrorMessage error={links.error || error} />
       {links.data && (
         <>
-          <a className="button" href={links.data.google_url} target="_blank" rel="noreferrer">
-            Add to Google Calendar
+          <a className="button secondary" href={links.data.google_url} target="_blank" rel="noreferrer">
+            Subscribe in Google Calendar
           </a>
           <div className="actions">
             <a className="button secondary" href={links.data.webcal_url}>Apple / Outlook</a>

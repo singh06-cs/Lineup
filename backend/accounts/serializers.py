@@ -14,6 +14,26 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class MeSerializer(UserSerializer):
+    """The logged-in user's own profile, plus how they can sign in."""
+
+    google_linked = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['google_linked', 'has_password']
+
+    def get_google_linked(self, user):
+        return hasattr(user, 'google_identity')
+
+    def get_has_password(self, user):
+        return user.has_usable_password()
+
+
+class GoogleCredentialSerializer(serializers.Serializer):
+    credential = serializers.CharField()
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     # write_only: accepted on input, never included in a response
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})

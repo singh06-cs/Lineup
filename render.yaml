@@ -37,6 +37,18 @@ services:
         value: https://lineup-web.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
         value: https://lineup-api.onrender.com
+      # Encrypts stored Google tokens; generated once, so it survives SECRET_KEY changes.
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      # Google sign-in + Calendar sync (optional). sync: false = you paste them in Render's dashboard.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://lineup-api.onrender.com/api/calendar/google/callback/
+      - key: FRONTEND_URL
+        value: https://lineup-web.onrender.com
 
   - type: web
     name: lineup-web

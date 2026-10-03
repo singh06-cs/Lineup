@@ -3,6 +3,8 @@ import secrets
 from django.conf import settings
 from django.db import models
 
+from .crypto import decrypt, encrypt
+
 
 def generate_feed_token():
     # 32 random bytes: unguessable, so the URL itself can act as the password.
@@ -32,3 +34,31 @@ class CalendarFeed(models.Model):
     def __str__(self):
         return f'Calendar feed for {self.user}'
 
+
+class GoogleCalendarConnection(models.Model):
+    """A user's permission for Lineup to write to a "Lineup" calendar in their Google account."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='google_calendar',
+    )
+    google_email = models.EmailField(blank=True)
+    # Encrypted at rest (see crypto.py); use the refresh_token property, never this field.
+    encrypted_refresh_token = models.TextField()
+    # The secondary calendar Lineup created; empty until the first sync creates it.
+    calendar_id = models.CharField(max_length=255, blank=True)
+    connected_at = models.DateTimeField(auto_now_add=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+
+    @property
+    def refresh_token(self):
+        return decrypt(self.encrypted_refresh_token)
+
+    @refresh_token.setter
+    def refresh_token(self, value):
+        self.encrypted_refresh_token = encrypt(value)
+
+    def __str__(self):
+        return f'Google Calendar for {self.user}'

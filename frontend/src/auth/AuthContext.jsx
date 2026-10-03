@@ -29,6 +29,16 @@ export function AuthProvider({ children }) {
     setUser(await api.auth.me())
   }, [])
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    await api.auth.googleLogin(credential)
+    setUser(await api.auth.me())
+  }, [])
+
+  // After profile edits or linking Google, reload what the app knows about you.
+  const refreshUser = useCallback(async () => {
+    setUser(await api.auth.me())
+  }, [])
+
   const register = useCallback(async (fields) => {
     await api.auth.register(fields)
     await login(fields.username, fields.password)
@@ -40,8 +50,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, checking, login, register, logout }),
-    [user, checking, login, register, logout],
+    () => ({ user, checking, login, loginWithGoogle, refreshUser, register, logout }),
+    [user, checking, login, loginWithGoogle, refreshUser, register, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

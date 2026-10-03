@@ -14,7 +14,7 @@ export default function Layout() {
           <NavLink to="/schedule">My schedule</NavLink>
           <NavLink to="/shifts">Browse shifts</NavLink>
           <span className="spacer" />
-          <span className="muted">{user.username}</span>
+          <NavLink to="/account">{user.first_name || user.username}</NavLink>
           <button type="button" className="link-button" onClick={logout}>Log out</button>
         </nav>
       </header>

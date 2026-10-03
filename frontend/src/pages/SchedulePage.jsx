@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import * as api from '../api'
 import CalendarPanel from '../components/CalendarPanel'
@@ -11,7 +11,20 @@ import useApi from '../hooks/useApi'
 
 const KIND_LABELS = { LEC: 'Lecture', DIS: 'Discussion', LAB: 'Lab', SEM: 'Seminar', OTH: 'Other' }
 
+// Messages for when Google sends the browser back here (?google=...).
+const GOOGLE_RESULTS = {
+  connected: ['ok', 'Google Calendar connected. Your schedule is in the "Lineup" calendar.'],
+  cancelled: ['info', 'Google Calendar was not connected.'],
+  error: ['error', 'Google Calendar could not be connected. Please try again.'],
+}
+const GOOGLE_REASONS = {
+  permission: 'Lineup needs permission to manage its own calendar. Please tick that box on Google\'s screen.',
+  expired: 'The connection request expired. Please try again.',
+}
+
 export default function SchedulePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const googleResult = GOOGLE_RESULTS[searchParams.get('google')]
   const terms = useApi(() => api.terms.list())
   const [chosenTermId, setChosenTermId] = useState(null)
   const termId = chosenTermId ?? (terms.data?.length ? pickCurrentTerm(terms.data).id : null)
@@ -98,6 +111,18 @@ export default function SchedulePage() {
           {terms.data.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       </header>
+
+      {googleResult && (
+        <div className={`notice notice-${googleResult[0]}`} role="status">
+          <span>
+            {GOOGLE_REASONS[searchParams.get('reason')] ?? googleResult[1]}
+            {searchParams.get('synced') === 'false' && ' The first sync failed; use "Sync now" to retry.'}
+          </span>
+          <button type="button" className="link-button" onClick={() => setSearchParams({}, { replace: true })}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {shiftConflicts.data?.length > 0 && (
         <div className="warning" role="status">

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import RequireAuth from './auth/RequireAuth'
 import Layout from './components/Layout'
+import AccountPage from './pages/AccountPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import OrganizationPage from './pages/OrganizationPage'
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="orgs/:orgId" element={<OrganizationPage />} />
               <Route path="shifts" element={<ShiftsPage />} />
               <Route path="schedule" element={<SchedulePage />} />
+              <Route path="account" element={<AccountPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

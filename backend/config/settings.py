@@ -250,3 +250,22 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'TOKEN_REFRESH_SERIALIZER': 'accounts.serializers.SafeTokenRefreshSerializer',
 }
+
+
+# Google sign-in and Google Calendar sync
+# Both are switched off until GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set.
+# Create them at https://console.cloud.google.com/apis/credentials (OAuth client, "Web application").
+
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+# Where Google sends the browser back after the user approves calendar access.
+GOOGLE_REDIRECT_URI = os.environ.get(
+    'GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/calendar/google/callback/',
+)
+# Least privilege: Lineup may only create and manage its OWN "Lineup" calendar,
+# never read or change anything else in the user's Google Calendar.
+GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created'
+# The React app, so the OAuth callback can send the user back to it.
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+# Sync to Google after a change without making the user wait for Google's API.
+GOOGLE_SYNC_IN_BACKGROUND = True
