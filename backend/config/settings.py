@@ -62,10 +62,12 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'corsheaders',
-    # Local apps (dependencies flow one way: scheduling -> organizations -> accounts)
+    # Local apps. Dependencies flow one way: scheduling -> organizations -> accounts,
+    # and courses -> accounts.
     'accounts',
     'organizations',
     'scheduling',
+    'courses',
 ]
 
 # Must be set before the first migrate; changing it later is very painful
@@ -154,6 +156,9 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
+
+# Class meeting times ("MWF 10:00") are wall-clock times on campus, not UTC instants.
+CAMPUS_TIME_ZONE = 'America/Los_Angeles'
 
 USE_I18N = True
 
