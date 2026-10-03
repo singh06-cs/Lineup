@@ -1,10 +1,12 @@
-from django.db.models import Prefetch
+from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, mixins, permissions, status, viewsets
+from rest_framework import filters, mixins, permissions, serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from . import services
 from .filters import SectionFilter
-from .models import Course, Meeting, Section, Term
+from .models import Course, Enrollment, Meeting, Section, Term
 from .permissions import IsCreatorOrStaff
 from .serializers import CourseSerializer, SectionSerializer, TermSerializer
 
@@ -39,11 +41,16 @@ class SectionViewSet(
     search_fields = ['course__subject', 'course__number', 'course__title', 'crn', 'instructor']
 
     def get_queryset(self):
+        user = self.request.user
         return (
             Section.objects
             .select_related('course', 'term', 'created_by')
             # One extra query for ALL sections' meetings, not one per section.
             .prefetch_related(Prefetch('meetings', queryset=Meeting.objects.order_by('kind', 'start_time')))
+            .annotate(
+                enrolled_count=Count('enrollments'),
+                is_enrolled=Exists(Enrollment.objects.filter(section=OuterRef('pk'), user=user)),
+            )
         )
 
     def get_permissions(self):
@@ -66,3 +73,21 @@ class SectionViewSet(
         serializer = self.get_serializer(self.get_object(), data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         return self.respond_with_section(serializer.save())
+
+    def perform_destroy(self, section):
+        # Don't let one student delete a section other students have on their schedules.
+        if section.enrollments.exclude(user=self.request.user).exists():
+            raise serializers.ValidationError(
+                {'detail': 'Other students have this section on their schedule, so it cannot be deleted.'}
+            )
+        section.delete()
+
+    @action(detail=True, methods=['post', 'delete'])
+    def enroll(self, request, pk=None):
+        """POST adds this section to your schedule, DELETE drops it."""
+        section = self.get_object()
+        if request.method == 'POST':
+            services.enroll(request.user, section)
+            return self.respond_with_section(section, status.HTTP_201_CREATED)
+        services.drop(request.user, section)
+        return self.respond_with_section(section)

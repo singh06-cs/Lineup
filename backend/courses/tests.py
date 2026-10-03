@@ -134,6 +134,7 @@ from django.contrib.auth import get_user_model  # noqa: E402
 from rest_framework import status  # noqa: E402
 from rest_framework.test import APITestCase  # noqa: E402
 
+from .models import Enrollment  # noqa: E402
 
 User = get_user_model()
 
@@ -246,9 +247,89 @@ class CatalogApiTests(CatalogApiTestCase):
 
         self.assertEqual([m['days'] for m in response.data['meetings']], ['TR'])
 
+    def test_cannot_delete_section_others_are_enrolled_in(self):
+        section_id = self.add_section()['id']
+        Enrollment.objects.create(user=self.bob, section_id=section_id)
+
+        response = self.client.delete(f'{SECTIONS}{section_id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Section.objects.filter(pk=section_id).exists())
+
     def test_terms_endpoint_includes_holidays(self):
         Holiday.objects.create(term=self.term, date=date(2026, 11, 11), name='Veterans Day')
 
         response = self.client.get('/api/terms/')
 
         self.assertEqual(response.data[0]['holidays'], [{'date': '2026-11-11', 'name': 'Veterans Day'}])
+
+
+# ---------- Phase 14: enrolling and class-vs-class conflicts ----------
+
+class EnrollmentTests(CatalogApiTestCase):
+    def enroll(self, section_id):
+        return self.client.post(f'{SECTIONS}{section_id}/enroll/')
+
+    def test_enroll_and_drop(self):
+        section_id = self.add_section()['id']
+
+        enrolled = self.enroll(section_id)
+        self.assertEqual(enrolled.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(enrolled.data['is_enrolled'])
+        self.assertEqual(enrolled.data['enrolled_count'], 1)
+
+        mine = self.client.get(f'{SECTIONS}?mine=true').data['results']
+        self.assertEqual([s['id'] for s in mine], [section_id])
+
+        dropped = self.client.delete(f'{SECTIONS}{section_id}/enroll/')
+        self.assertFalse(dropped.data['is_enrolled'])
+
+    def test_cannot_enroll_twice(self):
+        section_id = self.add_section()['id']
+        self.enroll(section_id)
+
+        self.assertEqual(self.enroll(section_id).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_only_one_section_per_course(self):
+        first = self.add_section(crn='11111')['id']
+        second = self.add_section(crn='22222', section_code='A02', meetings=[
+            {'kind': 'LEC', 'days': 'TR', 'start_time': '16:10', 'end_time': '17:30'},
+        ])['id']
+        self.enroll(first)
+
+        response = self.enroll(second)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Drop it first', str(response.data['detail']))
+
+    def test_time_conflict_blocks_enrollment(self):
+        ecs = self.add_section(crn='11111')['id']  # MWF 10:00-10:50
+        mat = self.add_section(crn='22222', subject='MAT', number='021A', meetings=[
+            {'kind': 'LEC', 'days': 'WF', 'start_time': '10:30', 'end_time': '11:20'},
+        ])['id']
+        self.enroll(ecs)
+
+        response = self.enroll(mat)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ECS 036A Lecture', str(response.data['detail']))
+
+    def test_back_to_back_and_different_days_are_fine(self):
+        ecs = self.add_section(crn='11111')['id']  # MWF 10:00-10:50, R 14:10-15:00
+        mat = self.add_section(crn='22222', subject='MAT', number='021A', meetings=[
+            {'kind': 'LEC', 'days': 'MWF', 'start_time': '10:50', 'end_time': '11:40'},
+            {'kind': 'DIS', 'days': 'T', 'start_time': '14:10', 'end_time': '15:00'},
+        ])['id']
+        self.enroll(ecs)
+
+        self.assertEqual(self.enroll(mat).status_code, status.HTTP_201_CREATED)
+
+    def test_different_terms_never_conflict(self):
+        winter = make_term('Winter 2027', date(2027, 1, 4), date(2027, 3, 12))
+        fall_ecs = self.add_section(crn='11111')['id']
+        winter_mat = self.client.post(SECTIONS, section_payload(
+            winter, crn='22222', subject='MAT', number='021A',
+        ), format='json').data['id']
+        self.enroll(fall_ecs)
+
+        self.assertEqual(self.enroll(winter_mat).status_code, status.HTTP_201_CREATED)

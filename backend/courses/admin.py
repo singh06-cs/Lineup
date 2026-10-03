@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Course, Holiday, Meeting, Section, Term
+from .models import Course, Enrollment, Holiday, Meeting, Section, Term
 
 
 class HolidayInline(admin.TabularInline):
@@ -42,3 +42,10 @@ class SectionAdmin(admin.ModelAdmin):
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 
+
+@admin.register(Enrollment)
+class EnrollmentAdmin(admin.ModelAdmin):
+    list_display = ['user', 'section', 'created_at']
+    list_filter = ['section__term']
+    search_fields = ['user__username', 'section__crn', 'section__course__subject']
+    autocomplete_fields = ['user', 'section']

@@ -175,5 +175,36 @@ class Meeting(models.Model):
         """Python weekday numbers (Monday=0) for this meeting, e.g. "MWF" -> [0, 2, 4]."""
         return [WEEKDAY_LETTERS.index(letter) for letter in self.days]
 
+    def describe(self):
+        """Human-readable, e.g. "ECS 036A Lecture (MWF 10:00-10:50)"."""
+        return (
+            f'{self.section.course} {self.get_kind_display()} '
+            f'({self.days} {self.start_time:%H:%M}-{self.end_time:%H:%M})'
+        )
+
     def __str__(self):
         return f'{self.section.course} {self.get_kind_display()} {self.days} {self.start_time:%H:%M}'
+
+
+class Enrollment(models.Model):
+    """A section on a student's schedule (a through model, like Signup for shifts)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='enrollments',
+    )
+    section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='enrollments')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'section'],
+                name='unique_enrollment',
+                violation_error_message='This section is already on your schedule.',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.user} in {self.section}'

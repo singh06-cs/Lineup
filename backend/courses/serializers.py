@@ -85,6 +85,9 @@ class SectionSerializer(serializers.ModelSerializer):
     meetings = MeetingSerializer(many=True)
     term_name = serializers.CharField(source='term.name', read_only=True)
     created_by = serializers.CharField(source='created_by.username', read_only=True, default=None)
+    # From annotate() in the view.
+    enrolled_count = serializers.IntegerField(read_only=True)
+    is_enrolled = serializers.BooleanField(read_only=True)
     can_edit = serializers.SerializerMethodField()
 
     class Meta:
@@ -92,7 +95,7 @@ class SectionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'term', 'term_name', 'course', 'crn', 'section_code', 'instructor',
             'final_exam_start', 'final_exam_end', 'meetings',
-            'can_edit', 'created_by',
+            'enrolled_count', 'is_enrolled', 'can_edit', 'created_by',
         ]
         read_only_fields = ['id']
 
