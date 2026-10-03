@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
 
+from courses.models import WeeklySlot
+
 
 class Shift(models.Model):
     organization = models.ForeignKey(
@@ -79,3 +81,26 @@ class Signup(models.Model):
 
     def __str__(self):
         return f'{self.user} -> {self.shift}'
+
+
+class ClubMeeting(WeeklySlot):
+    """An org's regular weekly meeting, repeating through a term (skipping holidays).
+
+    Inherits days/start_time/end_time/location and their constraints from WeeklySlot,
+    the same base the course catalog's class Meeting uses.
+    """
+
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.CASCADE,
+        related_name='club_meetings',
+    )
+    term = models.ForeignKey('courses.Term', on_delete=models.PROTECT, related_name='club_meetings')
+    title = models.CharField(max_length=200, default='General meeting')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta(WeeklySlot.Meta):
+        ordering = ['term__instruction_begins', 'start_time']
+
+    def __str__(self):
+        return f'{self.organization}: {self.title} ({self.days} {self.start_time:%H:%M})'

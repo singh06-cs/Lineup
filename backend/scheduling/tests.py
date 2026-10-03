@@ -383,3 +383,61 @@ class ShiftClassConflictTests(ShiftTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0]['shift']['title'], 'Tabling')
         self.assertIn('ECS 036A', response.data[0]['conflicts'][0])
+
+
+# ---------- Phase 16: club meetings ----------
+
+class ClubMeetingTests(ShiftTestCase):
+    URL = '/api/club-meetings/'
+
+    def setUp(self):
+        from courses.models import Term
+
+        super().setUp()
+        self.term = Term.objects.create(
+            name='Fall 2026', instruction_begins=at(-24).date(), instruction_ends=at(24 * 60).date(),
+        )
+
+    def payload(self, **overrides):
+        data = {
+            'organization': self.org.pk, 'term': self.term.pk, 'title': 'General meeting',
+            'days': 't', 'start_time': '18:00', 'end_time': '19:00', 'location': 'Wellman 26',
+        }
+        data.update(overrides)
+        return data
+
+    def test_admin_schedules_weekly_meeting(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(self.URL, self.payload())
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['days'], 'T')
+        self.assertTrue(response.data['can_manage'])
+
+    def test_member_sees_but_cannot_create_or_edit(self):
+        self.client.force_authenticate(self.admin)
+        meeting_id = self.client.post(self.URL, self.payload()).data['id']
+        self.client.force_authenticate(self.member)
+
+        listed = self.client.get(f'{self.URL}?organization={self.org.pk}')
+        created = self.client.post(self.URL, self.payload())
+        edited = self.client.patch(f'{self.URL}{meeting_id}/', {'title': 'x'})
+
+        self.assertEqual([m['id'] for m in listed.data], [meeting_id])
+        self.assertEqual(created.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(edited.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_outsider_sees_nothing(self):
+        self.client.force_authenticate(self.admin)
+        self.client.post(self.URL, self.payload())
+        self.client.force_authenticate(self.outsider)
+
+        self.assertEqual(self.client.get(self.URL).data, [])
+
+    def test_end_after_start(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(self.URL, self.payload(end_time='17:00'))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

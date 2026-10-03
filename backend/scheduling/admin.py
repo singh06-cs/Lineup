@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db.models import Count
 
-from .models import Shift, Signup
+from .models import ClubMeeting, Shift, Signup
 
 
 class SignupInline(admin.TabularInline):
@@ -43,3 +43,10 @@ class SignupAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'shift__title']
     autocomplete_fields = ['user', 'shift']
     list_select_related = ['user', 'shift']
+
+
+@admin.register(ClubMeeting)
+class ClubMeetingAdmin(admin.ModelAdmin):
+    list_display = ['organization', 'title', 'term', 'days', 'start_time', 'end_time', 'location']
+    list_filter = ['term', 'organization']
+    autocomplete_fields = ['organization']

@@ -1,10 +1,11 @@
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
+from courses.serializers import DaysField, WeeklySlotSerializerMixin
 from organizations.models import Organization
 from organizations.permissions import is_org_admin
 
-from .models import Shift, Signup
+from .models import ClubMeeting, Shift, Signup
 
 
 class MyOrganizationField(serializers.PrimaryKeyRelatedField):
@@ -64,3 +65,22 @@ class RosterEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Signup
         fields = ['id', 'user', 'created_at']
+
+
+class ClubMeetingSerializer(WeeklySlotSerializerMixin, serializers.ModelSerializer):
+    organization = MyOrganizationField()
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    term_name = serializers.CharField(source='term.name', read_only=True)
+    days = DaysField(max_length=20)
+    can_manage = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ClubMeeting
+        fields = [
+            'id', 'organization', 'organization_name', 'term', 'term_name', 'title',
+            'days', 'start_time', 'end_time', 'location', 'can_manage',
+        ]
+        read_only_fields = ['id']
+
+    # Same rule as shifts: only an org's admins can schedule its meetings.
+    validate_organization = ShiftSerializer.validate_organization

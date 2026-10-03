@@ -58,7 +58,7 @@ class CatalogConstraintTests(TestCase):
         meeting = Meeting(section=self.section, days='TR', start_time=time(12), end_time=time(11))
         with self.assertRaises(ValidationError) as ctx:
             meeting.full_clean()
-        self.assertIn('A meeting must end after it starts.', ctx.exception.messages)
+        self.assertIn('It must end after it starts.', ctx.exception.messages)
 
         with self.assertRaises(ValidationError) as ctx:
             Section(term=self.term, course=self.course, crn='12a45').full_clean()

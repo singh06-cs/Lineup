@@ -12,7 +12,10 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'description', 'invite_code', 'member_count', 'my_role', 'created_at']
+        fields = [
+            'id', 'name', 'description', 'clubly_url', 'invite_code', 'member_count', 'my_role',
+            'created_at',
+        ]
         read_only_fields = ['id', 'invite_code', 'created_at']
 
     def to_representation(self, instance):

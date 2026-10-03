@@ -1,6 +1,7 @@
 import secrets
 
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 
 
@@ -13,6 +14,15 @@ class Organization(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     invite_code = models.CharField(max_length=16, unique=True, default=generate_invite_code)
+    # Link to the club's page on Clubly (AggieWorks' UC Davis club finder). Restricted to
+    # clubly.org so an org can't use this field to send members to an arbitrary site.
+    clubly_url = models.URLField(
+        blank=True,
+        validators=[RegexValidator(
+            r'^https://(www\.)?clubly\.org/[\w-]+/?$',
+            'Use your club\'s Clubly page, e.g. https://clubly.org/mathclubatucdavis',
+        )],
+    )
     # Role differs per (user, org) pair, so it lives on the through model, not here or on User.
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

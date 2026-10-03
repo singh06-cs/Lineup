@@ -192,3 +192,30 @@ class MemberManagementTests(OrgTestCase):
 
         self.assertEqual([m['user']['username'] for m in response.data], ['admin1', 'member1'])
         self.assertEqual(response.data[0]['role'], 'admin')
+
+
+class ClublyLinkTests(OrgTestCase):
+    def set_link(self, url):
+        self.client.force_authenticate(self.admin)
+        return self.client.patch(org_url(self.org), {'clubly_url': url})
+
+    def test_admin_links_clubly_page(self):
+        response = self.set_link('https://clubly.org/mathclubatucdavis')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['clubly_url'], 'https://clubly.org/mathclubatucdavis')
+
+    def test_only_clubly_links_allowed(self):
+        for url in [
+            'https://evil.com/mathclub',
+            'https://clubly.org.evil.com/mathclub',
+            'http://clubly.org/mathclub',  # must be https
+            'https://clubly.org/a/b',
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(self.set_link(url).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_link_can_be_cleared(self):
+        self.set_link('https://clubly.org/mathclubatucdavis')
+
+        self.assertEqual(self.set_link('').data['clubly_url'], '')

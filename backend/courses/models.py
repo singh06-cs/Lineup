@@ -133,7 +133,46 @@ class Section(models.Model):
         return f'{self.course}{code} ({self.term}, CRN {self.crn})'
 
 
-class Meeting(models.Model):
+class WeeklySlot(models.Model):
+    """Abstract base: something that repeats every week at the same campus-local time.
+
+    `abstract = True` means no table of its own; each subclass (class Meeting,
+    ClubMeeting) gets these fields and rules in its own table. One definition, no copy-paste.
+    """
+
+    days = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(DAYS_PATTERN, 'Use days in order from MTWRFSU, e.g. "MWF" or "TR".')],
+        help_text='Days in order using M T W R F S U (R = Thursday), e.g. "MWF".',
+    )
+    start_time = models.TimeField(help_text='Campus local time')
+    end_time = models.TimeField(help_text='Campus local time')
+    location = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        abstract = True
+        # %(app_label)s_%(class)s gives each subclass its own constraint names.
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(end_time__gt=F('start_time')),
+                name='%(app_label)s_%(class)s_ends_after_start',
+                violation_error_message='It must end after it starts.',
+            ),
+            # Same rule as the validator, enforced by the database too ("" is rejected).
+            models.CheckConstraint(
+                condition=Q(days__regex=DAYS_PATTERN) & ~Q(days=''),
+                name='%(app_label)s_%(class)s_days_valid',
+                violation_error_message='Use days in order from MTWRFSU, e.g. "MWF" or "TR".',
+            ),
+        ]
+
+    @property
+    def weekdays(self):
+        """Python weekday numbers (Monday=0), e.g. "MWF" -> [0, 2, 4]."""
+        return [WEEKDAY_LETTERS.index(letter) for letter in self.days]
+
+
+class Meeting(WeeklySlot):
     """One weekly time slot of a section, e.g. the lecture or the discussion."""
 
     class Kind(models.TextChoices):
@@ -145,35 +184,9 @@ class Meeting(models.Model):
 
     section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='meetings')
     kind = models.CharField(max_length=3, choices=Kind.choices, default=Kind.LECTURE)
-    days = models.CharField(
-        max_length=7,
-        validators=[RegexValidator(DAYS_PATTERN, 'Use days in order from MTWRFSU, e.g. "MWF" or "TR".')],
-        help_text='Days in order using M T W R F S U (R = Thursday), e.g. "MWF".',
-    )
-    start_time = models.TimeField(help_text='Campus local time')
-    end_time = models.TimeField(help_text='Campus local time')
-    location = models.CharField(max_length=100, blank=True)
 
-    class Meta:
+    class Meta(WeeklySlot.Meta):
         ordering = ['section', 'kind', 'start_time']
-        constraints = [
-            models.CheckConstraint(
-                condition=Q(end_time__gt=F('start_time')),
-                name='meeting_ends_after_start',
-                violation_error_message='A meeting must end after it starts.',
-            ),
-            # Same rule as the validator, enforced by the database too ("" is rejected).
-            models.CheckConstraint(
-                condition=Q(days__regex=DAYS_PATTERN) & ~Q(days=''),
-                name='meeting_days_valid',
-                violation_error_message='Use days in order from MTWRFSU, e.g. "MWF" or "TR".',
-            ),
-        ]
-
-    @property
-    def weekdays(self):
-        """Python weekday numbers (Monday=0) for this meeting, e.g. "MWF" -> [0, 2, 4]."""
-        return [WEEKDAY_LETTERS.index(letter) for letter in self.days]
 
     def describe(self):
         """Human-readable, e.g. "ECS 036A Lecture (MWF 10:00-10:50)"."""

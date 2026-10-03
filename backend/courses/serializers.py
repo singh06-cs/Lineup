@@ -3,7 +3,7 @@ import re
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import Course, Holiday, Meeting, Section, Term
+from .models import WEEKDAY_LETTERS, Course, Holiday, Meeting, Section, Term
 
 
 class HolidaySerializer(serializers.ModelSerializer):
@@ -52,26 +52,35 @@ class CourseSerializer(serializers.ModelSerializer):
         return digits.zfill(3) + letters.upper()
 
 
-class MeetingSerializer(serializers.ModelSerializer):
-    days = serializers.CharField(max_length=20)  # normalized below, then stored as e.g. "MWF"
+class DaysField(serializers.CharField):
+    """Accepts "wfm" or "M W F" and stores the canonical ordered form "MWF"."""
+
+    def to_internal_value(self, data):
+        letters = set(super().to_internal_value(data).replace(' ', '').upper())
+        ordered = ''.join(day for day in WEEKDAY_LETTERS if day in letters)
+        if not ordered or len(ordered) != len(letters):
+            raise serializers.ValidationError('Use day letters M T W R F S U (R = Thursday).')
+        return ordered
+
+
+class WeeklySlotSerializerMixin:
+    """Shared validation for anything built on the WeeklySlot model."""
+
+    def validate(self, attrs):
+        start = attrs.get('start_time', getattr(self.instance, 'start_time', None))
+        end = attrs.get('end_time', getattr(self.instance, 'end_time', None))
+        if start and end and end <= start:
+            raise serializers.ValidationError({'end_time': 'It must end after it starts.'})
+        return super().validate(attrs)
+
+
+class MeetingSerializer(WeeklySlotSerializerMixin, serializers.ModelSerializer):
+    days = DaysField(max_length=20)
 
     class Meta:
         model = Meeting
         fields = ['id', 'kind', 'days', 'start_time', 'end_time', 'location']
         read_only_fields = ['id']
-
-    def validate_days(self, value):
-        # Accept "wfm" or "M W F" and store the canonical ordered form "MWF".
-        letters = set(value.replace(' ', '').upper())
-        ordered = ''.join(day for day in 'MTWRFSU' if day in letters)
-        if not ordered or len(ordered) != len(letters):
-            raise serializers.ValidationError('Use day letters M T W R F S U (R = Thursday).')
-        return ordered
-
-    def validate(self, attrs):
-        if attrs['end_time'] <= attrs['start_time']:
-            raise serializers.ValidationError({'end_time': 'A meeting must end after it starts.'})
-        return attrs
 
 
 class SectionSerializer(serializers.ModelSerializer):
