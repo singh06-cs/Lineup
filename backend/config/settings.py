@@ -64,10 +64,12 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps. Dependencies flow one way:
     # scheduling -> organizations -> accounts, and scheduling -> courses -> accounts.
+    # calendars sits on top and reads from all of them.
     'accounts',
     'organizations',
     'scheduling',
     'courses',
+    'calendars',
 ]
 
 # Must be set before the first migrate; changing it later is very painful

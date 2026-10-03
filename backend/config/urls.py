@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from calendars.views import ics_feed
+
 admin.site.site_header = 'Lineup Admin'
 admin.site.site_title = 'Lineup Admin'
 
@@ -26,4 +28,7 @@ urlpatterns = [
     path('api/', include('organizations.urls')),
     path('api/', include('scheduling.urls')),
     path('api/', include('courses.urls')),
+    path('api/calendar/', include('calendars.urls')),
+    # Outside /api/: fetched by calendar apps, not by our frontend.
+    path('calendar/<str:token>.ics', ics_feed, name='calendar-ics'),
 ]
