@@ -126,3 +126,129 @@ class LoadTermsCommandTests(TestCase):
 
         with self.assertRaises(CommandError):
             self.run_command('--term', 'Fall 1999')
+
+
+# ---------- Phase 13: catalog API ----------
+
+from django.contrib.auth import get_user_model  # noqa: E402
+from rest_framework import status  # noqa: E402
+from rest_framework.test import APITestCase  # noqa: E402
+
+
+User = get_user_model()
+
+SECTIONS = '/api/sections/'
+
+
+def section_payload(term, crn='12345', subject='ECS', number='036A', meetings=None, **extra):
+    payload = {
+        'term': term.pk,
+        'course': {'subject': subject, 'number': number, 'title': 'Programming in Python', 'units': '4.0'},
+        'crn': crn,
+        'section_code': 'A01',
+        'instructor': 'Lee',
+        'meetings': meetings if meetings is not None else [
+            {'kind': 'LEC', 'days': 'MWF', 'start_time': '10:00', 'end_time': '10:50', 'location': 'Wellman 2'},
+            {'kind': 'DIS', 'days': 'R', 'start_time': '14:10', 'end_time': '15:00', 'location': 'Olson 6'},
+        ],
+    }
+    payload.update(extra)
+    return payload
+
+
+class CatalogApiTestCase(APITestCase):
+    def setUp(self):
+        self.term = make_term()
+        self.alice = User.objects.create_user('alice', 'alice@example.com', 'pw-for-tests-1')
+        self.bob = User.objects.create_user('bob', 'bob@example.com', 'pw-for-tests-1')
+        self.client.force_authenticate(self.alice)
+
+    def add_section(self, **kwargs):
+        response = self.client.post(SECTIONS, section_payload(self.term, **kwargs), format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        return response.data
+
+
+class CatalogApiTests(CatalogApiTestCase):
+    def test_add_section_with_course_and_meetings_in_one_request(self):
+        data = self.add_section()
+
+        self.assertEqual(data['course']['subject'], 'ECS')
+        self.assertEqual(len(data['meetings']), 2)
+        self.assertEqual(data['created_by'], 'alice')
+        self.assertTrue(data['can_edit'])
+        self.assertEqual(Course.objects.count(), 1)
+
+    def test_existing_course_is_reused_not_duplicated(self):
+        self.add_section(crn='12345')
+        self.add_section(crn='12346')
+
+        self.assertEqual(Course.objects.count(), 1)
+        self.assertEqual(Section.objects.count(), 2)
+
+    def test_input_is_normalized(self):
+        data = self.add_section(subject='ecs', number='36a', meetings=[
+            {'kind': 'LEC', 'days': 'f w m', 'start_time': '10:00', 'end_time': '10:50'},
+        ])
+
+        self.assertEqual((data['course']['subject'], data['course']['number']), ('ECS', '036A'))
+        self.assertEqual(data['meetings'][0]['days'], 'MWF')
+
+    def test_duplicate_crn_in_term_rejected(self):
+        self.add_section(crn='12345')
+
+        response = self.client.post(SECTIONS, section_payload(self.term, crn='12345'), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_meeting_rejected_and_nothing_saved(self):
+        response = self.client.post(SECTIONS, section_payload(self.term, meetings=[
+            {'kind': 'LEC', 'days': 'MWF', 'start_time': '11:00', 'end_time': '10:00'},
+        ]), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Course.objects.count(), 0)  # validation runs before anything is written
+
+    def test_search_and_filters(self):
+        self.add_section(crn='11111', subject='ECS', number='036A')
+        self.add_section(crn='22222', subject='MAT', number='021A')
+
+        def crns(query):
+            return [s['crn'] for s in self.client.get(f'{SECTIONS}{query}').data['results']]
+
+        self.assertEqual(crns('?search=ECS 36'), ['11111'])
+        self.assertEqual(crns('?subject=mat'), ['22222'])
+        self.assertEqual(crns('?crn=11111'), ['11111'])
+        self.assertEqual(crns(f'?term={self.term.pk}'), ['11111', '22222'])
+
+    def test_list_query_count_is_constant(self):
+        for i in range(10):
+            self.add_section(crn=f'1{i:04d}')
+
+        # count + sections (with course/term JOINed) + one prefetch for all meetings
+        with self.assertNumQueries(3):
+            self.client.get(SECTIONS)
+
+    def test_only_creator_can_edit(self):
+        section_id = self.add_section()['id']
+        self.client.force_authenticate(self.bob)
+
+        response = self.client.patch(f'{SECTIONS}{section_id}/', {'instructor': 'Hacker'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_editing_meetings_replaces_them(self):
+        section_id = self.add_section()['id']
+
+        response = self.client.patch(f'{SECTIONS}{section_id}/', {'meetings': [
+            {'kind': 'LEC', 'days': 'TR', 'start_time': '09:00', 'end_time': '10:20'},
+        ]}, format='json')
+
+        self.assertEqual([m['days'] for m in response.data['meetings']], ['TR'])
+
+    def test_terms_endpoint_includes_holidays(self):
+        Holiday.objects.create(term=self.term, date=date(2026, 11, 11), name='Veterans Day')
+
+        response = self.client.get('/api/terms/')
+
+        self.assertEqual(response.data[0]['holidays'], [{'date': '2026-11-11', 'name': 'Veterans Day'}])
