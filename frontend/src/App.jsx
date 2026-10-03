@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import OrganizationPage from './pages/OrganizationPage'
 import RegisterPage from './pages/RegisterPage'
+import SchedulePage from './pages/SchedulePage'
 import ShiftsPage from './pages/ShiftsPage'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="orgs/:orgId" element={<OrganizationPage />} />
               <Route path="shifts" element={<ShiftsPage />} />
+              <Route path="schedule" element={<SchedulePage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

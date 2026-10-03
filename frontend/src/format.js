@@ -23,3 +23,27 @@ export function toLocalInput(iso) {
 export function fromLocalInput(value) {
   return value ? new Date(value).toISOString() : ''
 }
+
+export const DAY_NAMES = { M: 'Mon', T: 'Tue', W: 'Wed', R: 'Thu', F: 'Fri', S: 'Sat', U: 'Sun' }
+
+// "14:10:00" (a campus wall-clock time from the API) -> "2:10 PM"
+export function formatTimeOfDay(value) {
+  const [hours, minutes] = value.split(':').map(Number)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+export function minutesOfDay(value) {
+  const [hours, minutes] = value.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+export function formatSlot(slot) {
+  return `${slot.days} ${formatTimeOfDay(slot.start_time)}–${formatTimeOfDay(slot.end_time)}`
+}
+
+// The term that's in session now, otherwise the next one, otherwise the latest.
+export function pickCurrentTerm(terms) {
+  const today = new Date().toLocaleDateString('en-CA') // local YYYY-MM-DD
+  return terms.find((t) => t.instruction_ends >= today) ?? terms[terms.length - 1]
+}

@@ -11,6 +11,7 @@ export default function Layout() {
         <nav className="topbar-inner">
           <NavLink to="/" className="brand">Lineup</NavLink>
           <NavLink to="/" end>My orgs</NavLink>
+          <NavLink to="/schedule">My schedule</NavLink>
           <NavLink to="/shifts">Browse shifts</NavLink>
           <span className="spacer" />
           <span className="muted">{user.username}</span>

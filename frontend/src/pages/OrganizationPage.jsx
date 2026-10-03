@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
 import * as api from '../api'
+import ClubMeetings from '../components/ClubMeetings'
 import useAuth from '../auth/useAuth'
 import ErrorMessage from '../components/ErrorMessage'
 import ShiftForm from '../components/ShiftForm'
@@ -21,6 +22,7 @@ export default function OrganizationPage() {
   if (org.error) return <ErrorMessage error={org.error} />
 
   const isAdmin = org.data.my_role === 'admin'
+
 
   async function leave() {
     if (!window.confirm(`Leave ${org.data.name}?`)) return
@@ -48,6 +50,11 @@ export default function OrganizationPage() {
         <div>
           <h1>{org.data.name}</h1>
           {org.data.description && <p className="muted">{org.data.description}</p>}
+          {org.data.clubly_url && (
+            <a href={org.data.clubly_url} target="_blank" rel="noreferrer" className="small">
+              View on Clubly ↗
+            </a>
+          )}
         </div>
         <div className="actions">
           <button type="button" className="secondary" onClick={leave}>Leave</button>
@@ -78,6 +85,8 @@ export default function OrganizationPage() {
 
         <aside className="stack">
           {isAdmin && <InvitePanel org={org.data} onChange={org.setData} />}
+          <ClubMeetings orgId={orgId} isAdmin={isAdmin} />
+          {isAdmin && <ClublyLinkForm org={org.data} onChange={org.setData} />}
           <MemberList orgId={orgId} isAdmin={isAdmin} onChanged={org.reload} />
         </aside>
       </div>
@@ -175,5 +184,39 @@ function MemberList({ orgId, isAdmin, onChanged }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+function ClublyLinkForm({ org, onChange }) {
+  const [url, setUrl] = useState(org.clubly_url)
+  const [error, setError] = useState(null)
+  const [saved, setSaved] = useState(false)
+
+  async function submit(event) {
+    event.preventDefault()
+    setError(null)
+    try {
+      onChange(await api.organizations.update(org.id, { clubly_url: url.trim() }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    } catch (err) {
+      setError(err)
+    }
+  }
+
+  return (
+    <form className="card form" onSubmit={submit}>
+      <h3>Clubly page</h3>
+      <p className="muted small">Link your club's page on Clubly so members can find it.</p>
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://clubly.org/yourclub"
+        aria-label="Clubly URL"
+      />
+      <ErrorMessage error={error} />
+      <button type="submit" className="secondary">{saved ? 'Saved' : 'Save link'}</button>
+    </form>
   )
 }

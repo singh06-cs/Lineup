@@ -13,11 +13,13 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    # Migrations run on every deploy so the schema always matches the code.
+    # Migrations run on every deploy so the schema always matches the code;
+    # load_terms is idempotent, so re-running it just keeps quarter dates current.
     buildCommand: >-
       pip install -r requirements.txt &&
       python manage.py collectstatic --noinput &&
-      python manage.py migrate --noinput
+      python manage.py migrate --noinput &&
+      python manage.py load_terms
     # gunicorn: a production WSGI server (runserver is single-threaded and dev-only).
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
     envVars:

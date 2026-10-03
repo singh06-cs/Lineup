@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 User = get_user_model()
 
@@ -29,3 +31,17 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # create_user() hashes the password; objects.create() would store it as plain text
         return User.objects.create_user(**validated_data)
+
+
+class SafeTokenRefreshSerializer(TokenRefreshSerializer):
+    """SimpleJWT's refresh, but a token whose user was deleted gets a 401, not a 500.
+
+    The library looks the user up and doesn't catch DoesNotExist, so refreshing a
+    token after the account is gone crashed the request.
+    """
+
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except User.DoesNotExist:
+            raise InvalidToken('This account no longer exists.')

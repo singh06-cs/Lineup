@@ -89,3 +89,11 @@ class TokenFlowTests(APITestCase):
 
         self.assertEqual(logout.status_code, status.HTTP_205_RESET_CONTENT)
         self.assertEqual(refresh.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_after_account_deleted_is_401_not_500(self):
+        tokens = self.login()
+        self.user.delete()
+
+        response = self.client.post(reverse('token-refresh'), {'refresh': tokens['refresh']})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

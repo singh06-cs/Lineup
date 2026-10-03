@@ -245,4 +245,5 @@ SIMPLE_JWT = {
     # Each refresh issues a new refresh token and blacklists the old one, so logout can revoke it
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'TOKEN_REFRESH_SERIALIZER': 'accounts.serializers.SafeTokenRefreshSerializer',
 }
