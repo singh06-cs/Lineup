@@ -62,8 +62,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'corsheaders',
-    # Local apps. Dependencies flow one way: scheduling -> organizations -> accounts,
-    # and courses -> accounts.
+    # Local apps. Dependencies flow one way:
+    # scheduling -> organizations -> accounts, and scheduling -> courses -> accounts.
     'accounts',
     'organizations',
     'scheduling',

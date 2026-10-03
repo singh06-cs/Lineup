@@ -9,6 +9,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from courses.services import class_conflicts
+
 from .models import Shift, Signup
 
 User = get_user_model()
@@ -53,7 +55,33 @@ def sign_up(user, shift):
                 code='overlap',
             )
 
+        # Classes come first: a volunteer shift can't overlap a class or final exam.
+        busy = class_conflicts(user, shift.start_time, shift.end_time)
+        if busy:
+            raise ValidationError(
+                {'detail': f'This shift overlaps your class: {busy[0]}.'}, code='class_conflict',
+            )
+
         return Signup.objects.create(user=user, shift=shift)
+
+
+def shifts_conflicting_with_classes(user):
+    """The user's upcoming shifts that clash with their class schedule.
+
+    Enrolling in a class isn't blocked by a shift you already signed up for, so this
+    lets the app warn you to cancel the shift instead.
+    """
+    upcoming = (
+        Shift.objects
+        .filter(signups__user=user, end_time__gt=timezone.now())
+        .select_related('organization')
+    )
+    results = []
+    for shift in upcoming:
+        busy = class_conflicts(user, shift.start_time, shift.end_time)
+        if busy:
+            results.append({'shift': shift, 'conflicts': busy})
+    return results
 
 
 def cancel_signup(user, shift):

@@ -75,6 +75,16 @@ class ShiftViewSet(viewsets.ModelViewSet):
         services.cancel_signup(request.user, shift)
         return self.respond_with_shift(shift)
 
+    @action(detail=False, methods=['get'], url_path='class-conflicts')
+    def class_conflicts(self, request):
+        """Your upcoming shifts that now clash with your class schedule."""
+        results = services.shifts_conflicting_with_classes(request.user)
+        shifts = {s.pk: s for s in self.get_queryset().filter(pk__in=[r['shift'].pk for r in results])}
+        return Response([
+            {'shift': self.get_serializer(shifts[r['shift'].pk]).data, 'conflicts': r['conflicts']}
+            for r in results
+        ])
+
     @action(detail=True, methods=['get'])
     def roster(self, request, pk=None):
         shift = self.get_object()

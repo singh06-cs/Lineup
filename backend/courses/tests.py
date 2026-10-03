@@ -135,6 +135,7 @@ from rest_framework import status  # noqa: E402
 from rest_framework.test import APITestCase  # noqa: E402
 
 from .models import Enrollment  # noqa: E402
+from .services import class_conflicts  # noqa: E402
 
 User = get_user_model()
 
@@ -333,3 +334,49 @@ class EnrollmentTests(CatalogApiTestCase):
         self.enroll(fall_ecs)
 
         self.assertEqual(self.enroll(winter_mat).status_code, status.HTTP_201_CREATED)
+
+
+# ---------- Phase 15: shifts vs classes (time zones!) ----------
+
+class ClassConflictTests(CatalogApiTestCase):
+    """Fall 2026 class: MWF 10:00-10:50 Pacific. Daylight saving ends Sun Nov 1, 2026."""
+
+    def setUp(self):
+        super().setUp()
+        Holiday.objects.create(term=self.term, date=date(2026, 11, 11), name='Veterans Day')
+        Enrollment.objects.create(user=self.alice, section_id=self.add_section()['id'])
+
+    def utc(self, *args):
+        return datetime(*args, tzinfo=timezone.UTC)
+
+    def conflicts(self, start, end):
+        return class_conflicts(self.alice, start, end)
+
+    def test_conflict_before_dst_change(self):
+        # Mon Oct 26, 10:00 PDT = 17:00 UTC
+        self.assertTrue(self.conflicts(self.utc(2026, 10, 26, 17, 0), self.utc(2026, 10, 26, 17, 30)))
+        self.assertFalse(self.conflicts(self.utc(2026, 10, 26, 18, 0), self.utc(2026, 10, 26, 18, 30)))
+
+    def test_conflict_after_dst_change(self):
+        # Mon Nov 2, 10:00 PST = 18:00 UTC. The class didn't move on the wall clock,
+        # so in UTC it moved an hour later. Storing class times as UTC would get this wrong.
+        self.assertFalse(self.conflicts(self.utc(2026, 11, 2, 17, 0), self.utc(2026, 11, 2, 17, 30)))
+        self.assertTrue(self.conflicts(self.utc(2026, 11, 2, 18, 0), self.utc(2026, 11, 2, 18, 30)))
+
+    def test_no_conflict_on_holidays_off_days_or_outside_term(self):
+        holiday = self.conflicts(self.utc(2026, 11, 11, 18, 0), self.utc(2026, 11, 11, 19, 0))
+        tuesday = self.conflicts(self.utc(2026, 11, 3, 18, 0), self.utc(2026, 11, 3, 19, 0))
+        after_term = self.conflicts(self.utc(2026, 12, 7, 18, 0), self.utc(2026, 12, 7, 19, 0))
+
+        self.assertEqual((holiday, tuesday, after_term), ([], [], []))
+
+    def test_final_exam_conflict(self):
+        section = Section.objects.get()
+        section.final_exam_start = self.utc(2026, 12, 8, 16)
+        section.final_exam_end = self.utc(2026, 12, 8, 18)
+        section.save()
+
+        self.assertEqual(
+            self.conflicts(self.utc(2026, 12, 8, 17), self.utc(2026, 12, 8, 19)),
+            ['ECS 036A final exam'],
+        )

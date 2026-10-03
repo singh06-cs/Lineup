@@ -343,3 +343,43 @@ class ConcurrentSignupTests(TransactionTestCase):
         self.assertEqual(results.count('ok'), 2)
         self.assertEqual(results.count('rejected'), 6)
         self.assertEqual(Signup.objects.filter(shift=shift).count(), 2)
+
+
+# ---------- Phase 15: shift signups respect class schedules ----------
+
+class ShiftClassConflictTests(ShiftTestCase):
+    def setUp(self):
+        from datetime import date, time
+
+        from courses.models import Course, Enrollment, Meeting, Section, Term
+
+        super().setUp()
+        today = timezone.localdate()
+        term = Term.objects.create(
+            name='Test term', instruction_begins=today, instruction_ends=today + timedelta(days=60),
+        )
+        section = Section.objects.create(
+            term=term, crn='12345',
+            course=Course.objects.create(subject='ECS', number='036A', title='Python'),
+        )
+        # A class that meets every day, all day: any shift in the term will clash.
+        Meeting.objects.create(section=section, days='MTWRFSU', start_time=time(0), end_time=time(23, 59))
+        Enrollment.objects.create(user=self.member, section=section)
+        self.client.force_authenticate(self.member)
+        self.date = date
+
+    def test_cannot_sign_up_for_shift_during_class(self):
+        response = self.client.post(shift_url(self.shift, 'signup/'))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('overlaps your class', str(response.data['detail']))
+
+    def test_conflicts_endpoint_lists_existing_signups_that_now_clash(self):
+        # Signed up before enrolling (created directly, bypassing the rule).
+        Signup.objects.create(user=self.member, shift=self.shift)
+
+        response = self.client.get(f'{SHIFTS}class-conflicts/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]['shift']['title'], 'Tabling')
+        self.assertIn('ECS 036A', response.data[0]['conflicts'][0])
