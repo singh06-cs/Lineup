@@ -50,7 +50,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    # Local apps (dependencies flow one way: scheduling -> organizations -> accounts)
+    'accounts',
+    'organizations',
+    'scheduling',
 ]
+
+# Must be set before the first migrate; changing it later is very painful
+AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     # Outermost layer so every response (incl. redirects/errors) gets CORS headers
