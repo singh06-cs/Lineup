@@ -46,9 +46,10 @@ class CreateAndListTests(OrgTestCase):
 
         response = self.client.get(ORGS)
 
-        self.assertEqual([o['name'] for o in response.data], ['Chess Club'])
-        self.assertEqual(response.data[0]['member_count'], 2)
-        self.assertEqual(response.data[0]['my_role'], 'member')
+        results = response.data['results']
+        self.assertEqual([o['name'] for o in results], ['Chess Club'])
+        self.assertEqual(results[0]['member_count'], 2)
+        self.assertEqual(results[0]['my_role'], 'member')
 
     def test_invite_code_hidden_from_regular_members(self):
         self.client.force_authenticate(self.member)
