@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -21,6 +22,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load secrets and environment-specific values from backend/.env
 load_dotenv(BASE_DIR / '.env')
+
+
+def env_list(name, default=''):
+    """Read a comma-separated environment variable, e.g. "a.com,b.com" -> ['a.com', 'b.com']."""
+    return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
@@ -32,12 +38,15 @@ SECRET_KEY = os.environ['SECRET_KEY']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
+# Domain names this server answers to. Production sets e.g. "lineup-api.onrender.com".
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
-# Frontends allowed to read API responses from a browser (least privilege: no wildcard)
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',  # Vite (React) dev server
-]
+# Frontends allowed to read API responses from a browser (least privilege: no wildcard).
+# Defaults to the Vite (React) dev server.
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS', 'http://localhost:5173')
+
+# Origins allowed to submit forms with a CSRF token over HTTPS (the admin login page).
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 
 
 # Application definition
@@ -66,6 +75,8 @@ MIDDLEWARE = [
     # Outermost layer so every response (incl. redirects/errors) gets CORS headers
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    # Serves collected static files (admin CSS/JS) from the app itself in production
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -97,18 +108,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        # SQLite ignores select_for_update(). IMMEDIATE makes every transaction take the
-        # write lock up front, so concurrent signups still run one at a time.
-        'OPTIONS': {'transaction_mode': 'IMMEDIATE'},
-        # File-based test DB: the default in-memory one errors on lock contention instead
-        # of waiting, which breaks the concurrent-signup test.
-        'TEST': {'NAME': BASE_DIR / 'test_db.sqlite3'},
+if os.environ.get('DATABASE_URL'):
+    # Production: PostgreSQL, where select_for_update() takes real row locks.
+    # conn_max_age reuses connections instead of opening one per request.
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600, conn_health_checks=True),
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+            # SQLite ignores select_for_update(). IMMEDIATE makes every transaction take the
+            # write lock up front, so concurrent signups still run one at a time.
+            'OPTIONS': {'transaction_mode': 'IMMEDIATE'},
+            # File-based test DB: the default in-memory one errors on lock contention instead
+            # of waiting, which breaks the concurrent-signup test.
+            'TEST': {'NAME': BASE_DIR / 'test_db.sqlite3'},
+        }
+    }
 
 
 # Password validation
@@ -146,16 +164,50 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+# `collectstatic` copies every app's static files here for WhiteNoise to serve
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+if not DEBUG:
+    STORAGES = {
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        # Compressed + hashed filenames (app.3f2a1c.css) so browsers can cache them forever
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
+
+
+# Production security (HTTPS)
+# https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+
+if not DEBUG:
+    # The host terminates HTTPS and forwards plain HTTP; this header says the original was HTTPS.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True  # cookies only travel over HTTPS
+    CSRF_COOKIE_SECURE = True
+    # HSTS: browsers refuse plain HTTP for this domain for 30 days
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+if DEBUG:
+    # Development: emails are printed to the terminal instead of sent.
+    MAILERS = {'default': {'BACKEND': 'django.core.mail.backends.console.EmailBackend'}}
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': os.environ.get('EMAIL_HOST', 'localhost'),
+                'port': int(os.environ.get('EMAIL_PORT', '587')),
+                'username': os.environ.get('EMAIL_HOST_USER', ''),
+                'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+                'use_tls': True,
+            },
+        },
+    }
 
 
 # Django REST Framework
