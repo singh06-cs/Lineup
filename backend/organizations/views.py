@@ -49,6 +49,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                     my_memberships.filter(organization=OuterRef('pk')).values('role')[:1]
                 ),
             )
+            # Explicit: Meta.ordering is dropped in GROUP BY (Count) queries, which
+            # would make pagination order unpredictable.
+            .order_by('name', 'pk')
         )
 
     def get_permissions(self):

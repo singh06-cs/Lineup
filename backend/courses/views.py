@@ -51,6 +51,9 @@ class SectionViewSet(
                 enrolled_count=Count('enrollments'),
                 is_enrolled=Exists(Enrollment.objects.filter(section=OuterRef('pk'), user=user)),
             )
+            # Explicit: Django drops Meta.ordering from GROUP BY (Count) queries, and
+            # pagination over an unordered queryset can repeat or skip rows.
+            .order_by('course__subject', 'course__number', 'section_code', 'pk')
         )
 
     def get_permissions(self):
