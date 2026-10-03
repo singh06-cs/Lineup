@@ -1,5 +1,6 @@
 import threading
 from datetime import timedelta
+from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -441,3 +442,24 @@ class ClubMeetingTests(ShiftTestCase):
         response = self.client.post(self.URL, self.payload(end_time='17:00'))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SeedDemoCommandTests(TransactionTestCase):
+    def test_refuses_without_debug(self):
+        from django.core.management import CommandError, call_command
+        from django.test import override_settings
+
+        with override_settings(DEBUG=False), self.assertRaises(CommandError):
+            call_command('seed_demo', stdout=StringIO())
+
+    def test_seeds_and_reseeds_without_duplicates(self):
+        from django.core.management import call_command
+        from django.test import override_settings
+
+        with override_settings(DEBUG=True):
+            call_command('seed_demo', stdout=StringIO())
+            call_command('seed_demo', stdout=StringIO())
+
+        self.assertEqual(Organization.objects.filter(name__endswith='(demo)').count(), 2)
+        self.assertEqual(Shift.objects.count(), 5)
+        self.assertEqual(User.objects.filter(username__startswith='demo_').count(), 2)

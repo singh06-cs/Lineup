@@ -75,13 +75,25 @@ npm run dev
 
 Open http://localhost:5173.
 
+**Demo data** (optional, development only):
+
+```bash
+cd backend && ../.venv/bin/python manage.py seed_demo
+```
+
+Creates two fictional orgs, shifts for the coming week, weekly club meetings, five demo
+course sections, and two accounts: `demo_admin` (runs both orgs) and `demo_student`
+(enrolled in two classes). Their shared password is `DEMO_PASSWORD` in
+`backend/scheduling/management/commands/seed_demo.py`. Re-running resets the demo data;
+the command refuses to run when `DEBUG` is off.
+
 ## Tests
 
 ```bash
 cd backend && ../.venv/bin/python manage.py test
 ```
 
-109 tests cover authentication, permissions, validation, filtering, query counts
+111 tests cover authentication, permissions, validation, filtering, query counts
 (N+1 guard), every signup and enrollment rule, time-zone handling across the
 daylight-saving change, the calendar feed (its repeat rules are expanded and checked
 against the real Fall 2026 class days), and a concurrency test where 8 users race for
