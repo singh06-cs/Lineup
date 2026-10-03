@@ -1,12 +1,17 @@
+import threading
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test import TransactionTestCase
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from organizations.models import Membership, Organization
 
+from . import services
 from .models import Shift, Signup
 
 User = get_user_model()
@@ -204,3 +209,137 @@ class ShiftListTests(ShiftTestCase):
             response = self.client.get(SHIFTS)
 
         self.assertEqual(response.data['count'], 16)
+
+
+# ---------- Phase 9: signups ----------
+
+class SignupTests(ShiftTestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(self.member)
+
+    def signup(self, shift):
+        return self.client.post(shift_url(shift, 'signup/'))
+
+    def test_sign_up_and_cancel(self):
+        joined = self.signup(self.shift)
+        self.assertEqual(joined.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(joined.data['is_signed_up'])
+        self.assertEqual(joined.data['spots_left'], 1)
+
+        cancelled = self.client.delete(shift_url(self.shift, 'signup/'))
+        self.assertEqual(cancelled.status_code, status.HTTP_200_OK)
+        self.assertFalse(cancelled.data['is_signed_up'])
+        self.assertEqual(cancelled.data['spots_left'], 2)
+
+    def test_cannot_sign_up_twice(self):
+        self.signup(self.shift)
+
+        response = self.signup(self.shift)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Signup.objects.filter(shift=self.shift).count(), 1)
+
+    def test_cannot_sign_up_for_full_shift(self):
+        Signup.objects.create(user=self.admin, shift=self.shift)
+        Signup.objects.create(user=self.outsider, shift=self.shift)
+
+        response = self.signup(self.shift)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('full', str(response.data['detail']))
+
+    def test_cannot_sign_up_for_overlapping_shift(self):
+        self.signup(self.shift)  # 24h -> 26h
+        overlapping = self.make_shift('Cleanup', start=25, end=27)
+
+        response = self.signup(overlapping)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Tabling', str(response.data['detail']))
+
+    def test_back_to_back_shifts_do_not_overlap(self):
+        self.signup(self.shift)  # ends at 26h
+        next_one = self.make_shift('Next', start=26, end=28)
+
+        self.assertEqual(self.signup(next_one).status_code, status.HTTP_201_CREATED)
+
+    def test_overlap_is_checked_across_organizations(self):
+        other = Organization.objects.create(name='Robotics')
+        Membership.objects.create(user=self.member, organization=other)
+        self.signup(self.shift)
+
+        response = self.signup(self.make_shift('Robot demo', start=25, end=26, org=other))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_sign_up_or_cancel_after_shift_started(self):
+        started = self.make_shift('Now', start=-1, end=1)
+        Signup.objects.create(user=self.admin, shift=started)
+
+        self.assertEqual(self.signup(started).status_code, status.HTTP_400_BAD_REQUEST)
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(
+            self.client.delete(shift_url(started, 'signup/')).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_cancel_when_not_signed_up(self):
+        response = self.client.delete(shift_url(self.shift, 'signup/'))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_outsider_cannot_sign_up(self):
+        self.client.force_authenticate(self.outsider)
+
+        self.assertEqual(self.signup(self.shift).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_roster_is_admin_only(self):
+        self.signup(self.shift)
+
+        self.assertEqual(
+            self.client.get(shift_url(self.shift, 'roster/')).status_code, status.HTTP_403_FORBIDDEN,
+        )
+        self.client.force_authenticate(self.admin)
+        roster = self.client.get(shift_url(self.shift, 'roster/'))
+        self.assertEqual([r['user']['username'] for r in roster.data], ['member1'])
+
+
+class ConcurrentSignupTests(TransactionTestCase):
+    """The showcase test: many people grab the last spots at the same instant.
+
+    TransactionTestCase (not TestCase) because each thread needs its own real
+    database connection and transaction; TestCase wraps everything in one.
+    """
+
+    def test_shift_is_never_overbooked(self):
+        org = Organization.objects.create(name='Chess Club')
+        shift = Shift.objects.create(
+            organization=org, title='Last spots', start_time=at(24), end_time=at(26), capacity=2,
+        )
+        users = [
+            User.objects.create_user(f'racer{i}', f'racer{i}@example.com', 'pw-for-tests-1')
+            for i in range(8)
+        ]
+        start_together = threading.Barrier(len(users))
+        results = []
+
+        def attempt(user):
+            start_together.wait()  # release all threads at the same moment
+            try:
+                services.sign_up(user, shift)
+                results.append('ok')
+            except ValidationError:
+                results.append('rejected')
+            finally:
+                connection.close()  # each thread opened its own connection
+
+        threads = [threading.Thread(target=attempt, args=(u,)) for u in users]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(results.count('ok'), 2)
+        self.assertEqual(results.count('rejected'), 6)
+        self.assertEqual(Signup.objects.filter(shift=shift).count(), 2)

@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
+from accounts.serializers import UserSerializer
 from organizations.models import Organization
 from organizations.permissions import is_org_admin
 
-from .models import Shift
+from .models import Shift, Signup
 
 
 class MyOrganizationField(serializers.PrimaryKeyRelatedField):
@@ -55,3 +56,11 @@ class ShiftSerializer(serializers.ModelSerializer):
                     'capacity': f'{taken} people are already signed up; capacity cannot go below that.',
                 })
         return attrs
+
+
+class RosterEntrySerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Signup
+        fields = ['id', 'user', 'created_at']

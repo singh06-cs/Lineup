@@ -101,6 +101,12 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # SQLite ignores select_for_update(). IMMEDIATE makes every transaction take the
+        # write lock up front, so concurrent signups still run one at a time.
+        'OPTIONS': {'transaction_mode': 'IMMEDIATE'},
+        # File-based test DB: the default in-memory one errors on lock contention instead
+        # of waiting, which breaks the concurrent-signup test.
+        'TEST': {'NAME': BASE_DIR / 'test_db.sqlite3'},
     }
 }
 

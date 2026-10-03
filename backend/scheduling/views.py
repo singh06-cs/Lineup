@@ -1,14 +1,16 @@
 from django.db.models import Count, Exists, F, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from organizations.models import Membership
 
+from . import services
 from .filters import ShiftFilter
 from .models import Shift, Signup
 from .permissions import IsShiftOrgAdmin
-from .serializers import ShiftSerializer
+from .serializers import RosterEntrySerializer, ShiftSerializer
 
 
 class ShiftViewSet(viewsets.ModelViewSet):
@@ -18,7 +20,7 @@ class ShiftViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'location', 'description']
     ordering_fields = ['start_time', 'spots_left']
     ordering = ['start_time']
-    admin_actions = {'update', 'partial_update', 'destroy'}
+    admin_actions = {'update', 'partial_update', 'destroy', 'roster'}
 
     def get_queryset(self):
         user = self.request.user
@@ -62,3 +64,19 @@ class ShiftViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         shift = serializer.save()
         return self.respond_with_shift(shift)
+
+    @action(detail=True, methods=['post', 'delete'])
+    def signup(self, request, pk=None):
+        """POST to sign up for this shift, DELETE to cancel."""
+        shift = self.get_object()
+        if request.method == 'POST':
+            services.sign_up(request.user, shift)
+            return self.respond_with_shift(shift, status.HTTP_201_CREATED)
+        services.cancel_signup(request.user, shift)
+        return self.respond_with_shift(shift)
+
+    @action(detail=True, methods=['get'])
+    def roster(self, request, pk=None):
+        shift = self.get_object()
+        signups = shift.signups.select_related('user').order_by('created_at')
+        return Response(RosterEntrySerializer(signups, many=True).data)
