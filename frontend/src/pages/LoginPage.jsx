@@ -5,6 +5,8 @@ import useAuth from '../auth/useAuth'
 import ErrorMessage from '../components/ErrorMessage'
 import GoogleButton from '../components/GoogleButton'
 
+const demoEnabled = import.meta.env.VITE_DEMO_MODE === 'true'
+
 export default function LoginPage() {
   const { user, login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
@@ -27,12 +29,11 @@ export default function LoginPage() {
     }
   }
 
-  async function submit(event) {
-    event.preventDefault()
+  async function signIn(loginUsername, loginPassword) {
     setSubmitting(true)
     setError(null)
     try {
-      await login(username, password)
+      await login(loginUsername, loginPassword)
       // Send them back to the page they originally tried to open.
       navigate(location.state?.from ?? '/', { replace: true })
     } catch (err) {
@@ -41,11 +42,41 @@ export default function LoginPage() {
     }
   }
 
+  function submit(event) {
+    event.preventDefault()
+    return signIn(username, password)
+  }
+
   return (
     <main className="auth-page">
       <form className="card form auth-card" onSubmit={submit}>
         <h1 className="brand-title">Lineup</h1>
         <p className="muted">Shift sign-ups for student organizations.</p>
+        {demoEnabled && (
+          <section className="stack" aria-label="Try the demo">
+            <p className="muted small">
+              Explore sample classes, organizations, and shifts. Demo accounts are shared.
+            </p>
+            <div className="actions">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => signIn('demo_student', 'Lineup-demo-2026')}
+              >
+                Try student demo
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={submitting}
+                onClick={() => signIn('demo_admin', 'Lineup-demo-2026')}
+              >
+                Try organizer demo
+              </button>
+            </div>
+            <p className="muted small">Or log in with your own account:</p>
+          </section>
+        )}
         <label>
           Username
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus />

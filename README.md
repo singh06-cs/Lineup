@@ -96,8 +96,9 @@ cd backend && ../.venv/bin/python manage.py seed_demo
 Creates two fictional orgs, shifts for the coming week, weekly club meetings, five demo
 course sections, and two accounts: `demo_admin` (runs both orgs) and `demo_student`
 (enrolled in two classes). Their shared password is `DEMO_PASSWORD` in
-`backend/scheduling/management/commands/seed_demo.py`. Re-running resets the demo data;
-the command refuses to run when `DEBUG` is off.
+`backend/scheduling/management/commands/seed_demo.py`. Re-running resets the demo data.
+Add `--if-empty` to preserve existing data. With `DEBUG` off, the command requires
+an explicit `DEMO_MODE=True`.
 
 ## Tests
 
@@ -105,7 +106,7 @@ the command refuses to run when `DEBUG` is off.
 cd backend && ../.venv/bin/python manage.py test
 ```
 
-142 tests cover authentication, permissions, validation, filtering, query counts
+147 tests cover authentication, permissions, validation, filtering, query counts
 (N+1 guard), every signup and enrollment rule, time-zone handling across the
 daylight-saving change, Google sign-in and Calendar sync (against a fake Google), the calendar feed (its repeat rules are expanded and checked
 against the real Fall 2026 class days), and a concurrency test where 8 users race for
@@ -146,6 +147,17 @@ and point it at this repo; it creates the PostgreSQL database, the API (which ru
 migrations on each deploy) and the static React site. Production configuration
 comes entirely from environment variables (see `backend/.env.example`).
 Each deploy also runs `load_terms`, which is safe to repeat, so the quarter dates stay current.
+
+The Blueprint enables a reviewer demo with `DEBUG=False`, `DEMO_MODE=True`, and
+`VITE_DEMO_MODE=true`. On the first deploy, `seed_demo --if-empty` creates sample
+accounts and schedules; later deploys preserve reviewers' changes. The login page
+offers **Try student demo** and **Try organizer demo**, so no account setup is needed.
+These shared accounts have no Django staff or superuser access. Google credentials
+are optional and can be added later in Render's environment settings.
+
+For a normal production deployment, turn both demo flags off and remove the
+`seed_demo --if-empty` build step. The free Render database expires after 30 days;
+use a paid database to keep the demo available beyond that period.
 
 Google Calendar can only subscribe to a feed on the public internet, so "Add to
 Google Calendar" works once deployed; locally, use "Download .ics" to check the feed.

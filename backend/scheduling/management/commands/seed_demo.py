@@ -1,11 +1,11 @@
 """python manage.py seed_demo
 
-Fills a development database with clearly-labeled demo data so the app can be shown
+Fills a development or opted-in demo database with sample data so the app can be shown
 off without typing everything in: two users, two orgs, shifts in the coming week,
 weekly club meetings, and a few course sections with one student enrolled.
 
-Re-running replaces the previous demo data. Refuses to run unless DEBUG is on, so it
-can't touch a production database by accident.
+Re-running replaces demo data unless --if-empty is passed. Refuses to run unless
+DEBUG or DEMO_MODE is on, so normal production data stays protected.
 
 Everything here is fictional: org names end in "(demo)", and demo sections use
 section codes D01..D05, "Demo instructor", and made-up CRNs starting with 9.
@@ -27,7 +27,7 @@ from scheduling.models import ClubMeeting, Shift, Signup
 
 User = get_user_model()
 
-DEMO_PASSWORD = 'Lineup-demo-2026'  # development-only accounts
+DEMO_PASSWORD = 'Lineup-demo-2026'  # public, shared demo accounts
 DEMO_INSTRUCTOR = 'Demo instructor'
 
 COURSES = [
@@ -63,11 +63,17 @@ def at(day, hour, minute=0):
 
 
 class Command(BaseCommand):
-    help = 'Load fictional demo users, orgs, shifts and course sections (development only).'
+    help = 'Load fictional accounts and schedules in development or an opted-in demo.'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--if-empty', action='store_true',
+            help='Seed only a new database; preserve existing accounts and application data.',
+        )
 
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError('seed_demo only runs with DEBUG=True, to protect real data.')
+        if not (settings.DEBUG or settings.DEMO_MODE):
+            raise CommandError('seed_demo requires DEBUG=True or an explicit DEMO_MODE=True.')
 
         call_command('load_terms', stdout=self.stdout)
         term = Term.objects.filter(
@@ -75,6 +81,11 @@ class Command(BaseCommand):
         ).first()
 
         with transaction.atomic():
+            if options['if_empty'] and (
+                User.objects.exists() or Organization.objects.exists() or Section.objects.exists()
+            ):
+                self.stdout.write('Existing application data found; skipping demo seed.')
+                return
             self.clear()
             admin, student = self.create_users()
             pantry, coding = self.create_orgs(admin, student)

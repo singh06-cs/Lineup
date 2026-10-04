@@ -19,14 +19,20 @@ services:
       pip install -r requirements.txt &&
       python manage.py collectstatic --noinput &&
       python manage.py migrate --noinput &&
-      python manage.py load_terms
+      python manage.py load_terms &&
+      python manage.py seed_demo --if-empty
     # gunicorn: a production WSGI server (runserver is single-threaded and dev-only).
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.4"
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
+      # Shared fictional accounts for reviewers; debug pages stay disabled.
+      - key: DEMO_MODE
+        value: "True"
       - key: DATABASE_URL
         fromDatabase:
           name: lineup-db
@@ -39,12 +45,9 @@ services:
         value: https://lineup-api.onrender.com
       # Encrypts stored Google tokens; generated once, so it survives SECRET_KEY changes.
       - key: TOKEN_ENCRYPTION_KEY
-        sync: false
-      # Google sign-in + Calendar sync (optional). sync: false = you paste them in Render's dashboard.
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
+        generateValue: true
+      # Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Render later to enable
+      # Google. Reviewers can use password/demo sign-in without Google setup.
       - key: GOOGLE_REDIRECT_URI
         value: https://lineup-api.onrender.com/api/calendar/google/callback/
       - key: FRONTEND_URL
@@ -63,5 +66,9 @@ services:
         destination: /index.html
     envVars:
       # Baked into the JavaScript at build time (Vite replaces import.meta.env.VITE_*).
+      - key: NODE_VERSION
+        value: "24.21.0"
+      - key: VITE_DEMO_MODE
+        value: "true"
       - key: VITE_API_URL
         value: https://lineup-api.onrender.com

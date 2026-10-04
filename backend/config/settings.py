@@ -38,6 +38,9 @@ SECRET_KEY = os.environ['SECRET_KEY']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
+# Explicit opt-in for shared, fictional demo accounts. Debug pages stay disabled.
+DEMO_MODE = os.environ.get('DEMO_MODE', 'False') == 'True'
+
 # Domain names this server answers to. Production sets e.g. "lineup-api.onrender.com".
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
