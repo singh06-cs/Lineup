@@ -9,6 +9,16 @@ Google Calendar.
 Built as an Aggie Works application project: a full web app with a **React**
 frontend and a **Django REST Framework** backend.
 
+## Demo videos
+
+### Web demo
+
+https://github.com/user-attachments/assets/14f2f6fe-71db-43c0-a96f-80caebd2b828
+
+### Mobile demo
+
+https://github.com/user-attachments/assets/ab96ecb5-ae97-404b-a330-3d4b03a45353
+
 ## Features
 
 - Accounts with JWT login (short-lived access tokens, rotating refresh tokens, real logout)
