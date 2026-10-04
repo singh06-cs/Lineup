@@ -54,16 +54,26 @@ render.yaml        one-click deploy (database + API + static site)
 
 ## Running locally
 
+**Prerequisites:** Python 3.12+ (Django 6.1's minimum) and Node.js 22.22+ (React Router's
+minimum; Vite needs 20.19+). SQLite is built into Python, so no database server is needed
+for development.
+
 **Backend**, from `backend/`:
 
 ```bash
 python3 -m venv ../.venv
 ../.venv/bin/pip install -r requirements.txt
-cp .env.example .env        # then put a real SECRET_KEY in .env
+cp .env.example .env        # then set SECRET_KEY in .env (command below)
 ../.venv/bin/python manage.py migrate
 ../.venv/bin/python manage.py load_terms        # official UC Davis 2026-27 quarter dates
 ../.venv/bin/python manage.py createsuperuser
 ../.venv/bin/python manage.py runserver
+```
+
+To generate a `SECRET_KEY` for `.env`:
+
+```bash
+../.venv/bin/python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
 The API runs at http://localhost:8000/api/ and the admin at http://localhost:8000/admin/.
